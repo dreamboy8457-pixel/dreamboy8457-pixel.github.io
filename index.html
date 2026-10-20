@@ -1,21 +1,396 @@
-<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VantaDream Portfolio</title>
 <style>
-body{margin:0;background:#060b14;color:#fff;font-family:Arial}
-header{padding:40px;text-align:center;background:linear-gradient(135deg,#0a1220,#163a70)}
-h1{font-size:48px;margin:0;color:#4da3ff}
-section{padding:28px;max-width:900px;margin:auto}
-.card{background:#0d1423;border:1px solid #234;border-radius:16px;padding:20px;margin:16px 0}
+*{box-sizing:border-box}
+body{margin:0;background:#060b14;color:#fff;font-family:Arial,sans-serif}
+header{padding:38px 18px;text-align:center;background:linear-gradient(135deg,#0a1220,#163a70)}
+h1{font-size:clamp(34px,8vw,48px);margin:0;color:#4da3ff}
+section{padding:20px;max-width:900px;margin:auto}
+.card{background:#0d1423;border:1px solid #234;border-radius:16px;padding:20px;margin:16px 0;overflow-wrap:anywhere}
+input,textarea{width:100%;padding:12px;margin:6px 0;background:#080f1d;color:white;border:1px solid #345;border-radius:8px}
+textarea{min-height:85px;resize:vertical}
+button{padding:10px 14px;margin:5px 4px 5px 0;border:0;border-radius:8px;background:#1766c2;color:white;cursor:pointer}
+button.secondary{background:#263449}
+button.danger{background:#9d303d}
 .badge{display:inline-block;padding:6px 10px;border-radius:8px;background:#123;color:#9cf;margin:4px}
-</style></head><body>
-<header><h1>VantaDream</h1><p>Discord & Minecraft Portfolio</p></header>
+.small{font-size:13px;color:#9aacc7}
+.hidden{display:none!important}
+hr{border-color:#234;margin:18px 0}
+a{color:#7bbcff}
+.project{border-color:#28517f}
+.comment{border-left:2px solid #28517f;padding:8px 12px;margin:12px 0}
+#status{white-space:pre-wrap;color:#9cf}
+</style>
+</head>
+<body>
+<header>
+<h1>VantaDream</h1>
+<p>Discord &amp; Minecraft Portfolio</p>
+<p class="small">Projects • Communities • Development</p>
+</header>
+
 <section>
-<div class='card'><h2>Craftify Studios</h2><p>Mods, Plugins, Resource Packs, Ticket System.</p></div>
-<div class='card'><h2>Rounder's Hub</h2><p>Gaming community and voice channels.</p></div>
-<div class='card'><h2>Rounder's Rec</h2><p>Recording server for creators.</p></div>
-<div class='card'><h2>Super SMP</h2><p>Paper Minecraft SMP project.</p></div>
-<div class='card'><h2>Indimon</h2><p>Fabric Cobblemon SMP concept.</p></div>
-<div class='card'><h2>Aethernodes X Rounder's Rec</h2><p>Hosting partnership concept.</p></div>
-<h2>Skills</h2>
-<span class='badge'>Discord Setup</span><span class='badge'>Roles</span><span class='badge'>Tickets</span><span class='badge'>Minecraft Servers</span><span class='badge'>Community Management</span>
-</section></body></html>
+<div class="card">
+<h2>Account</h2>
+<p id="accountInfo" class="small">Not logged in</p>
+<div id="authForm">
+<input id="email" type="email" placeholder="Email address" autocomplete="email">
+<input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+<button id="signupBtn">Sign Up</button>
+<button id="loginBtn">Log In</button>
+</div>
+<button id="logoutBtn" class="secondary hidden">Log Out</button>
+<p id="status" role="status"></p>
+</div>
+
+<div class="card">
+<h2>My Projects</h2>
+<p class="small">Log in to add your own project. Project owners can edit their projects.</p>
+<div id="projectForm" class="hidden">
+<input id="projectTitle" maxlength="90" placeholder="Project name">
+<textarea id="projectDescription" maxlength="3000" placeholder="Describe your project"></textarea>
+<input id="projectLink" type="url" placeholder="Project link (optional, https://...)">
+<button id="saveProjectBtn">Add Project</button>
+<button id="cancelEditBtn" class="secondary hidden">Cancel Edit</button>
+</div>
+<div id="projectsList">Loading projects…</div>
+</div>
+
+<div class="card">
+<h2>My Work</h2>
+<div><span class="badge">Discord Setup</span><span class="badge">Roles</span><span class="badge">Tickets</span><span class="badge">Minecraft Servers</span><span class="badge">Community Management</span></div>
+</div>
+
+<div class="card">
+<h2>Featured Projects</h2>
+<p><b>Craftify Studios</b> — Mods, plugins, resource packs and ticket system.</p>
+<p><b>Rounder's Hub</b> — Gaming community and voice channels.</p>
+<p><b>Rounder's Rec</b> — Recording server for creators.</p>
+<p><b>Super SMP</b> — Paper Minecraft SMP project.</p>
+<p><b>Indimon</b> — Fabric Cobblemon SMP concept.</p>
+<p><b>Aethernodes X Rounder's Rec</b> — Hosting partnership concept.</p>
+</div>
+</section>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+ getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+ signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+ getFirestore, collection, doc, getDoc, getDocs, addDoc,
+ updateDoc, deleteDoc, setDoc, query, orderBy, serverTimestamp,
+ runTransaction
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+
+const firebaseConfig = {
+ apiKey: "AIzaSyDBZpufUiuQ5IewQguigSChy9FzevxwJUo",
+ authDomain: "vantadream.firebaseapp.com",
+ projectId: "vantadream",
+ storageBucket: "vantadream.firebasestorage.app",
+ messagingSenderId: "589496019223",
+ appId: "1:589496019223:web:bde7c68d3fd66fb7e16f52",
+ measurementId: "G-2YCNDYMBNT"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+
+let currentUser = null;
+let isAdmin = false;
+let editingId = null;
+let projectCache = [];
+
+function status(message) { $("status").textContent = message; }
+function escapeHTML(value="") {
+ return String(value).replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function safeLink(value) {
+ try {
+  const u = new URL(value);
+  return u.protocol === "https:" ? u.href : "";
+ } catch { return ""; }
+}
+function dateText(timestamp) {
+ if (!timestamp?.toDate) return "";
+ return timestamp.toDate().toLocaleDateString();
+}
+
+$("signupBtn").onclick = async () => {
+ const email = $("email").value.trim();
+ const password = $("password").value;
+ if (password.length < 6) return status("Password must be at least 6 characters.");
+ try {
+  const credential = await createUserWithEmailAndPassword(auth,email,password);
+  await setDoc(doc(db,"users",credential.user.uid),{
+   email:credential.user.email, role:"user", createdAt:serverTimestamp()
+  });
+  status("Account created successfully!");
+ } catch(e) { status(e.message); }
+};
+
+$("loginBtn").onclick = async () => {
+ try {
+  await signInWithEmailAndPassword(auth,$("email").value.trim(),$("password").value);
+  status("Logged in successfully!");
+ } catch(e) { status(e.message); }
+};
+
+$("logoutBtn").onclick = async () => {
+ try { await signOut(auth); status("Logged out."); }
+ catch(e) { status(e.message); }
+};
+
+onAuthStateChanged(auth, async user => {
+ currentUser = user;
+ isAdmin = false;
+ $("accountInfo").textContent = user ? "Logged in: " + user.email : "Not logged in";
+ $("authForm").classList.toggle("hidden",!!user);
+ $("logoutBtn").classList.toggle("hidden",!user);
+ $("projectForm").classList.toggle("hidden",!user);
+ if(user) {
+  try {
+   const profile = await getDoc(doc(db,"users",user.uid));
+   isAdmin = profile.exists() && profile.data().role === "admin";
+  } catch(e) { status("Profile check: " + e.message); }
+ }
+ await loadProjects();
+});
+
+async function loadProjects() {
+ try {
+  const snap = await getDocs(query(collection(db,"projects"),orderBy("createdAt","desc")));
+  projectCache = snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderProjects();
+ } catch(e) {
+  $("projectsList").textContent = "Could not load projects: " + e.message +
+   " — Check that Firestore rules have been configured.";
+ }
+}
+
+function renderProjects() {
+ const host = $("projectsList");
+ host.replaceChildren();
+ if(!projectCache.length) {
+  host.textContent = "No community projects yet. Log in to add one!";
+  return;
+ }
+ projectCache.forEach(p => {
+  const card = document.createElement("div");
+  card.className = "card project";
+  const title = document.createElement("h3");
+  title.textContent = p.title || "Untitled project";
+  const desc = document.createElement("p");
+  desc.textContent = p.description || "";
+  card.append(title,desc);
+
+  const link = safeLink(p.link || "");
+  if(link) {
+   const a = document.createElement("a");
+   a.href = link; a.target = "_blank"; a.rel = "noopener noreferrer";
+   a.textContent = "Open project";
+   card.append(a);
+  }
+
+  const meta = document.createElement("p");
+  meta.className = "small";
+  meta.textContent = "Owner: " + (p.ownerEmail || "Member") +
+   (p.createdAt ? " • " + dateText(p.createdAt) : "");
+  card.append(meta);
+
+  const actions = document.createElement("div");
+  const like = document.createElement("button");
+  like.textContent = "♥ Like";
+  like.disabled = !currentUser;
+  like.onclick = () => toggleLike(p.id);
+  actions.append(like);
+
+  if(currentUser && (p.ownerId===currentUser.uid || isAdmin)) {
+   const edit = document.createElement("button");
+   edit.textContent = "Edit";
+   edit.className = "secondary";
+   edit.onclick = () => startEdit(p);
+   actions.append(edit);
+
+   const del = document.createElement("button");
+   del.textContent = "Delete";
+   del.className = "danger";
+   del.onclick = () => deleteProject(p.id);
+   actions.append(del);
+  }
+  card.append(actions);
+
+  const commentsHeading = document.createElement("h4");
+  commentsHeading.textContent = "Comments & replies";
+  card.append(commentsHeading);
+
+  const commentInput = document.createElement("textarea");
+  commentInput.maxLength = 1000;
+  commentInput.placeholder = currentUser ? "Write a comment…" : "Log in to comment";
+  commentInput.disabled = !currentUser;
+  card.append(commentInput);
+
+  const commentBtn = document.createElement("button");
+  commentBtn.textContent = "Post Comment";
+  commentBtn.disabled = !currentUser;
+  commentBtn.onclick = () => postComment(p.id,commentInput.value,null);
+  card.append(commentBtn);
+
+  const commentList = document.createElement("div");
+  commentList.textContent = "Loading comments…";
+  card.append(commentList);
+  host.append(card);
+  loadComments(p.id,commentList);
+ });
+}
+
+async function saveProject() {
+ if(!currentUser) return status("Log in first.");
+ const title = $("projectTitle").value.trim();
+ const description = $("projectDescription").value.trim();
+ const rawLink = $("projectLink").value.trim();
+ if(!title || !description) return status("Enter a project name and description.");
+ if(rawLink && !safeLink(rawLink)) return status("Link must start with https://");
+
+ try {
+  if(editingId) {
+   const old = projectCache.find(p=>p.id===editingId);
+   if(!old || (old.ownerId!==currentUser.uid && !isAdmin))
+    throw new Error("You cannot edit this project.");
+   await updateDoc(doc(db,"projects",editingId),{
+    title,description,link:rawLink,updatedAt:serverTimestamp()
+   });
+   status("Project updated.");
+  } else {
+   await addDoc(collection(db,"projects"),{
+    title,description,link:rawLink,
+    ownerId:currentUser.uid,ownerEmail:currentUser.email,
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+   });
+   status("Project added.");
+  }
+  resetForm();
+  await loadProjects();
+ } catch(e) { status(e.message); }
+}
+$("saveProjectBtn").onclick = saveProject;
+
+function startEdit(p) {
+ editingId = p.id;
+ $("projectTitle").value = p.title || "";
+ $("projectDescription").value = p.description || "";
+ $("projectLink").value = p.link || "";
+ $("saveProjectBtn").textContent = "Save Changes";
+ $("cancelEditBtn").classList.remove("hidden");
+ $("projectForm").scrollIntoView({behavior:"smooth"});
+}
+function resetForm() {
+ editingId = null;
+ $("projectTitle").value = "";
+ $("projectDescription").value = "";
+ $("projectLink").value = "";
+ $("saveProjectBtn").textContent = "Add Project";
+ $("cancelEditBtn").classList.add("hidden");
+}
+$("cancelEditBtn").onclick = resetForm;
+
+async function deleteProject(id) {
+ if(!confirm("Delete this project and its visible project card?")) return;
+ try {
+  await deleteDoc(doc(db,"projects",id));
+  status("Project deleted. Its comments/likes may need separate cleanup.");
+  await loadProjects();
+ } catch(e) { status(e.message); }
+}
+
+async function toggleLike(projectId) {
+ if(!currentUser) return status("Log in to like projects.");
+ const likeRef = doc(db,"projects",projectId,"likes",currentUser.uid);
+ try {
+  await runTransaction(db,async tx=>{
+   const snap = await tx.get(likeRef);
+   if(snap.exists()) tx.delete(likeRef);
+   else tx.set(likeRef,{userId:currentUser.uid,createdAt:serverTimestamp()});
+  });
+  status("Like updated.");
+ } catch(e) { status(e.message); }
+}
+
+async function loadComments(projectId,container) {
+ try {
+  const snap = await getDocs(query(
+   collection(db,"projects",projectId,"comments"),orderBy("createdAt","asc")
+  ));
+  const comments = snap.docs.map(d=>({id:d.id,...d.data()}));
+  container.replaceChildren();
+  if(!comments.length) {
+   container.textContent = "No comments yet.";
+   return;
+  }
+  comments.forEach(c=>{
+   const item = document.createElement("div");
+   item.className = "comment";
+   const who = document.createElement("b");
+   who.textContent = c.userEmail || "Member";
+   const body = document.createElement("p");
+   body.textContent = c.text || "";
+   item.append(who,body);
+
+   if(c.parentId) item.style.marginLeft = "18px";
+
+   if(currentUser) {
+    const reply = document.createElement("button");
+    reply.className = "secondary";
+    reply.textContent = "Reply";
+    reply.onclick = async ()=>{
+     const text = prompt("Write your reply:");
+     if(text && text.trim()) await postComment(projectId,text,c.id);
+    };
+    item.append(reply);
+   }
+   if(currentUser && (c.userId===currentUser.uid || isAdmin)) {
+    const del = document.createElement("button");
+    del.className = "danger";
+    del.textContent = "Delete";
+    del.onclick = async ()=>{
+     if(!confirm("Delete this comment?")) return;
+     try {
+      await deleteDoc(doc(db,"projects",projectId,"comments",c.id));
+      await loadComments(projectId,container);
+     } catch(e) { status(e.message); }
+    };
+    item.append(del);
+   }
+   container.append(item);
+  });
+ } catch(e) {
+  container.textContent = "Comments unavailable: " + e.message;
+ }
+}
+
+async function postComment(projectId,text,parentId) {
+ if(!currentUser) return status("Log in to comment.");
+ text = text.trim();
+ if(!text || text.length>1000) return status("Comment must be 1–1000 characters.");
+ try {
+  await addDoc(collection(db,"projects",projectId,"comments"),{
+   text,userId:currentUser.uid,userEmail:currentUser.email,
+   parentId:parentId || null,createdAt:serverTimestamp()
+  });
+  status("Comment posted.");
+  await loadProjects();
+ } catch(e) { status(e.message); }
+}
+</script>
+</body>
+  </html>
+  
