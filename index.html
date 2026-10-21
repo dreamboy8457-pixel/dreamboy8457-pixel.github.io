@@ -12,7 +12,7 @@ header{padding:38px 18px;text-align:center;background:linear-gradient(135deg,#0a
 h1{font-size:clamp(34px,8vw,48px);margin:0;color:#4da3ff}
 section{padding:20px;max-width:900px;margin:auto}
 .card{background:#0d1423;border:1px solid #234;border-radius:16px;padding:20px;margin:16px 0;overflow-wrap:anywhere}
-input,textarea{width:100%;padding:12px;margin:6px 0;background:#080f1d;color:white;border:1px solid #345;border-radius:8px}
+input,textarea,select{width:100%;padding:12px;margin:6px 0;background:#080f1d;color:white;border:1px solid #345;border-radius:8px}
 textarea{min-height:85px;resize:vertical}
 button{padding:10px 14px;margin:5px 4px 5px 0;border:0;border-radius:8px;background:#1766c2;color:white;cursor:pointer}
 button:disabled{opacity:.5;cursor:not-allowed}
@@ -29,7 +29,8 @@ a{color:#7bbcff}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .stat{background:#080f1d;border:1px solid #234;padding:16px;border-radius:12px}
 .stat strong{display:block;font-size:28px;color:#4da3ff;margin-top:8px}
-.user-row{padding:12px 0;border-bottom:1px solid #234;overflow-wrap:anywhere}
+.user-row{padding:14px 0;border-bottom:1px solid #234;overflow-wrap:anywhere}
+.user-row select{max-width:240px}
 </style>
 </head>
 <body>
@@ -43,12 +44,14 @@ a{color:#7bbcff}
 <div class="card">
 <h2>Account</h2>
 <p id="accountInfo" class="small">Not logged in</p>
+
 <div id="authForm">
 <input id="email" type="email" placeholder="Email address" autocomplete="email">
 <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
 <button id="signupBtn">Sign Up</button>
 <button id="loginBtn">Log In</button>
 </div>
+
 <button id="logoutBtn" class="secondary hidden">Log Out</button>
 <p id="status" role="status"></p>
 </div>
@@ -65,19 +68,27 @@ a{color:#7bbcff}
 </div>
 
 <hr>
-<h3>Registered Users</h3>
-<p class="small">User roles are displayed below. Role editing is not enabled here.</p>
+<h3>User Management</h3>
+<p class="small">
+View registered users and manage their roles.
+You cannot change your own role from this panel.
+</p>
 <div id="adminUsersList">Loading users...</div>
 
 <hr>
 <h3>Project Management</h3>
-<p class="small">Admins can edit or delete any project from the My Projects section.</p>
+<p class="small">
+Admins can edit or delete any project from the My Projects section.
+</p>
 <button id="refreshAdminBtn">Refresh Dashboard</button>
 </div>
 
 <div class="card">
 <h2>My Projects</h2>
-<p class="small">Log in to add your own project. Project owners and admins can edit their projects.</p>
+<p class="small">
+Log in to add your own project. Project owners and admins can edit their projects.
+</p>
+
 <div id="projectForm" class="hidden">
 <input id="projectTitle" maxlength="90" placeholder="Project name">
 <textarea id="projectDescription" maxlength="3000" placeholder="Describe your project"></textarea>
@@ -85,6 +96,7 @@ a{color:#7bbcff}
 <button id="saveProjectBtn">Add Project</button>
 <button id="cancelEditBtn" class="secondary hidden">Cancel Edit</button>
 </div>
+
 <div id="projectsList">Loading projects…</div>
 </div>
 
@@ -111,13 +123,28 @@ a{color:#7bbcff}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+
 import {
- getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
- signOut, onAuthStateChanged
+ getAuth,
+ createUserWithEmailAndPassword,
+ signInWithEmailAndPassword,
+ signOut,
+ onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
 import {
- getFirestore, collection, doc, getDoc, getDocs, addDoc,
- updateDoc, deleteDoc, setDoc, query, orderBy, serverTimestamp,
+ getFirestore,
+ collection,
+ doc,
+ getDoc,
+ getDocs,
+ addDoc,
+ updateDoc,
+ deleteDoc,
+ setDoc,
+ query,
+ orderBy,
+ serverTimestamp,
  runTransaction
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
@@ -165,8 +192,9 @@ $("signupBtn").onclick = async () => {
  const password = $("password").value;
 
  if (!email) return status("Enter your email address.");
- if (password.length < 6)
+ if (password.length < 6) {
   return status("Password must be at least 6 characters.");
+ }
 
  try {
   const credential = await createUserWithEmailAndPassword(
@@ -229,7 +257,6 @@ onAuthStateChanged(auth, async user => {
   try {
    const profile = await getDoc(doc(db, "users", user.uid));
 
-   // Only the role stored in Firestore is checked here.
    isAdmin = profile.exists() &&
     profile.data().role === "admin";
   } catch(e) {
@@ -266,7 +293,7 @@ async function loadProjects() {
  }
 }
 
-// ADMIN DASHBOARD
+// ADMIN DASHBOARD AND USER LIST
 async function loadAdminDashboard() {
  const panel = $("adminDashboard");
 
@@ -277,14 +304,18 @@ async function loadAdminDashboard() {
 
  if (!currentUser || !isAdmin) return;
 
+ const adminUid = currentUser.uid;
+
  $("adminProjectCount").textContent = projectCache.length;
  $("adminUsersList").textContent = "Loading users...";
 
  try {
   const usersSnap = await getDocs(collection(db, "users"));
 
-  // Check that the same admin is still logged in.
-  if (!currentUser || !isAdmin) return;
+  // Do not render data if the session changed while loading.
+  if (!currentUser ||
+      currentUser.uid !== adminUid ||
+      !isAdmin) return;
 
   $("adminUserCount").textContent = usersSnap.size;
 
@@ -304,11 +335,71 @@ async function loadAdminDashboard() {
    const email = document.createElement("b");
    email.textContent = data.email || "Email unavailable";
 
-   const role = document.createElement("p");
-   role.className = "small";
-   role.textContent = "Role: " + (data.role || "user");
+   const roleText = document.createElement("p");
+   roleText.className = "small";
+   roleText.textContent =
+    "Current role: " + (data.role || "user");
 
-   row.append(email, role);
+   const roleSelect = document.createElement("select");
+   roleSelect.setAttribute(
+    "aria-label",
+    "Role for " + (data.email || "user")
+   );
+
+   ["user", "admin"].forEach(role => {
+    const option = document.createElement("option");
+    option.value = role;
+    option.textContent = role;
+    roleSelect.append(option);
+   });
+
+   const currentRole =
+    data.role === "admin" ? "admin" : "user";
+
+   roleSelect.value = currentRole;
+
+   const saveRoleBtn = document.createElement("button");
+   saveRoleBtn.textContent = "Save Role";
+
+   const isSelf = userDoc.id === adminUid;
+
+   // Protect the currently logged-in admin from accidental demotion.
+   roleSelect.disabled = isSelf;
+   saveRoleBtn.disabled = isSelf;
+
+   saveRoleBtn.onclick = async () => {
+    if (!currentUser || !isAdmin) {
+     return status("Admin permission required.");
+    }
+
+    if (roleSelect.value === currentRole) {
+     return status("No role change selected.");
+    }
+
+    if (!confirm(
+     "Change " + (data.email || "this user's") +
+     " role to " + roleSelect.value + "?"
+    )) return;
+
+    saveRoleBtn.disabled = true;
+
+    try {
+     await updateUserRole(userDoc.id, roleSelect.value);
+    } finally {
+     saveRoleBtn.disabled = false;
+    }
+   };
+
+   row.append(email, roleText, roleSelect, saveRoleBtn);
+
+   if (isSelf) {
+    const note = document.createElement("p");
+    note.className = "small";
+    note.textContent =
+     "Your own role cannot be changed from this panel.";
+    row.append(note);
+   }
+
    list.append(row);
   });
  } catch(e) {
@@ -318,6 +409,46 @@ async function loadAdminDashboard() {
  }
 }
 
+// CHANGE ANOTHER USER'S ROLE
+async function updateUserRole(uid, newRole) {
+ if (!currentUser || !isAdmin) {
+  return status("Admin permission required.");
+ }
+
+ if (uid === currentUser.uid) {
+  return status("You cannot change your own role here.");
+ }
+
+ if (!["user", "admin"].includes(newRole)) {
+  return status("Invalid role selected.");
+ }
+
+ try {
+  // Recheck the current admin profile before writing.
+  const adminProfile = await getDoc(
+   doc(db, "users", currentUser.uid)
+  );
+
+  if (!adminProfile.exists() ||
+      adminProfile.data().role !== "admin") {
+   isAdmin = false;
+   $("adminDashboard").classList.add("hidden");
+   return status("Admin permission is no longer valid.");
+  }
+
+  await updateDoc(doc(db, "users", uid), {
+   role: newRole
+  });
+
+  status("User role updated successfully.");
+  await loadAdminDashboard();
+ } catch(e) {
+  console.error("Role update error:", e);
+  status("Role update failed: " + e.message);
+ }
+}
+
+// REFRESH DASHBOARD
 $("refreshAdminBtn").onclick = async () => {
  await loadProjects();
  await loadAdminDashboard();
@@ -347,6 +478,7 @@ function renderProjects() {
   card.append(title, desc);
 
   const link = safeLink(p.link || "");
+
   if (link) {
    const a = document.createElement("a");
    a.href = link;
@@ -361,6 +493,7 @@ function renderProjects() {
   meta.textContent = "Owner: " +
    (p.ownerEmail || "Member") +
    (p.createdAt ? " • " + dateText(p.createdAt) : "");
+
   card.append(meta);
 
   const actions = document.createElement("div");
@@ -405,6 +538,7 @@ function renderProjects() {
   commentBtn.disabled = !currentUser;
   commentBtn.onclick = () =>
    postComment(p.id, commentInput.value, null);
+
   card.append(commentBtn);
 
   const commentList = document.createElement("div");
@@ -424,11 +558,13 @@ async function saveProject() {
  const description = $("projectDescription").value.trim();
  const rawLink = $("projectLink").value.trim();
 
- if (!title || !description)
+ if (!title || !description) {
   return status("Enter a project name and description.");
+ }
 
- if (rawLink && !safeLink(rawLink))
+ if (rawLink && !safeLink(rawLink)) {
   return status("Link must start with https://");
+ }
 
  try {
   if (editingId) {
@@ -523,7 +659,9 @@ async function deleteProject(id) {
 
 // LIKE / UNLIKE
 async function toggleLike(projectId) {
- if (!currentUser) return status("Log in to like projects.");
+ if (!currentUser) {
+  return status("Log in to like projects.");
+ }
 
  const likeRef = doc(
   db, "projects", projectId, "likes", currentUser.uid
@@ -625,6 +763,7 @@ async function loadComments(projectId, container) {
    container.append(item);
   });
  } catch(e) {
+  console.error("Comment load error:", e);
   container.textContent =
    "Comments unavailable. Check Firestore Rules.";
  }
@@ -632,7 +771,9 @@ async function loadComments(projectId, container) {
 
 // POST COMMENT OR REPLY
 async function postComment(projectId, text, parentId) {
- if (!currentUser) return status("Log in to comment.");
+ if (!currentUser) {
+  return status("Log in to comment.");
+ }
 
  text = text.trim();
 
@@ -647,16 +788,4 @@ async function postComment(projectId, text, parentId) {
    text,
    userId: currentUser.uid,
    userEmail: currentUser.email,
-   parentId: parentId || null,
-   createdAt: serverTimestamp()
-  });
-
-  status("Comment posted.");
-  await loadProjects();
- } catch(e) {
-  status("Comment error: " + e.message);
- }
-}
-</script>
-</body>
-</html>
+   parentId
