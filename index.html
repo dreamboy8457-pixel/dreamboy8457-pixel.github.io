@@ -749,6 +749,13 @@ async function loadComments(projectId, container) {
     reply.type = "button";
     reply.className = "secondary";
     reply.textContent = "Reply";
+       reply.addEventListener("click", async () => {
+     const text = prompt("Write your reply:");
+     if (text && text.trim()) {
+      await postComment(projectId, text, c.id);
+     }
+    });
+    item.append(reply);
    }
 
    if (currentUser &&
@@ -760,11 +767,8 @@ async function loadComments(projectId, container) {
 
     del.addEventListener("click", async () => {
      if (!confirm("Delete this comment?")) return;
-
      try {
-      await deleteDoc(doc(
-       db, "projects", projectId, "comments", c.id
-      ));
+      await deleteDoc(doc(db, "projects", projectId, "comments", c.id));
       await loadComments(projectId, container);
       status("Comment deleted.");
      } catch(e) {
@@ -783,10 +787,8 @@ async function loadComments(projectId, container) {
  }
 }
 
-// POST COMMENT OR REPLY
 async function postComment(projectId, text, parentId) {
  if (!currentUser) return status("Log in to comment.");
-
  text = text.trim();
 
  if (!text || text.length > 1000) {
@@ -794,9 +796,7 @@ async function postComment(projectId, text, parentId) {
  }
 
  try {
-  await addDoc(collection(
-   db, "projects", projectId, "comments"
-  ), {
+  await addDoc(collection(db, "projects", projectId, "comments"), {
    text,
    userId: currentUser.uid,
    userEmail: currentUser.email,
@@ -811,9 +811,7 @@ async function postComment(projectId, text, parentId) {
  }
 }
 
-// INITIAL PAGE STATUS
 status("Firebase initialized. You can log in or sign up.");
 </script>
-
 </body>
 </html>
