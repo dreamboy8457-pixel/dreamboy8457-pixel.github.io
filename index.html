@@ -22,10 +22,10 @@ button.danger{background:#9d303d}
 .small{font-size:13px;color:#9aacc7}
 .hidden{display:none!important}
 hr{border-color:#234;margin:18px 0}
-a{color:#7bbcff}
+a{color:#7bbcff;overflow-wrap:anywhere}
 .project{border-color:#28517f}
 .comment{border-left:2px solid #28517f;padding:8px 12px;margin:12px 0}
-#status{white-space:pre-wrap;color:#9cf}
+#status{white-space:pre-wrap;color:#9cf;overflow-wrap:anywhere}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
 .stat{background:#080f1d;border:1px solid #234;padding:16px;border-radius:12px}
 .stat strong{display:block;font-size:28px;color:#4da3ff;margin-top:8px}
@@ -34,6 +34,7 @@ a{color:#7bbcff}
 </style>
 </head>
 <body>
+
 <header>
 <h1>VantaDream</h1>
 <p>Discord &amp; Minecraft Portfolio</p>
@@ -43,20 +44,19 @@ a{color:#7bbcff}
 <section>
 <div class="card">
 <h2>Account</h2>
-<p id="accountInfo" class="small">Not logged in</p>
+<p id="accountInfo" class="small">Checking login status...</p>
 
 <div id="authForm">
 <input id="email" type="email" placeholder="Email address" autocomplete="email">
 <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
-<button id="signupBtn">Sign Up</button>
-<button id="loginBtn">Log In</button>
+<button id="signupBtn" type="button">Sign Up</button>
+<button id="loginBtn" type="button">Log In</button>
 </div>
 
-<button id="logoutBtn" class="secondary hidden">Log Out</button>
-<p id="status" role="status"></p>
+<button id="logoutBtn" type="button" class="secondary hidden">Log Out</button>
+<p id="status" role="status" aria-live="polite"></p>
 </div>
 
-<!-- ADMIN DASHBOARD -->
 <div id="adminDashboard" class="card hidden">
 <h2>⚡ Admin Dashboard</h2>
 <p class="small">VantaDream Portfolio Administration</p>
@@ -69,46 +69,37 @@ a{color:#7bbcff}
 
 <hr>
 <h3>User Management</h3>
-<p class="small">
-View registered users and manage their roles.
-You cannot change your own role from this panel.
-</p>
+<p class="small">View registered users and manage their roles. You cannot change your own role here.</p>
 <div id="adminUsersList">Loading users...</div>
 
 <hr>
 <h3>Project Management</h3>
-<p class="small">
-Admins can edit or delete any project from the My Projects section.
-</p>
-<button id="refreshAdminBtn">Refresh Dashboard</button>
+<p class="small">Admins can edit or delete any project from the My Projects section.</p>
+<button id="refreshAdminBtn" type="button">Refresh Dashboard</button>
 </div>
 
 <div class="card">
 <h2>My Projects</h2>
-<p class="small">
-Log in to add your own project. Project owners and admins can edit their projects.
-</p>
+<p class="small">Log in to add your own project. Project owners and admins can edit their projects.</p>
 
 <div id="projectForm" class="hidden">
 <input id="projectTitle" maxlength="90" placeholder="Project name">
 <textarea id="projectDescription" maxlength="3000" placeholder="Describe your project"></textarea>
 <input id="projectLink" type="url" placeholder="Project link (optional, https://...)">
-<button id="saveProjectBtn">Add Project</button>
-<button id="cancelEditBtn" class="secondary hidden">Cancel Edit</button>
+<button id="saveProjectBtn" type="button">Add Project</button>
+<button id="cancelEditBtn" type="button" class="secondary hidden">Cancel Edit</button>
 </div>
 
-<div id="projectsList">Loading projects…</div>
+<div id="projectsList">Loading projects...</div>
 </div>
 
 <div class="card">
 <h2>My Work</h2>
-<div>
 <span class="badge">Discord Setup</span>
 <span class="badge">Roles</span>
 <span class="badge">Tickets</span>
 <span class="badge">Minecraft Servers</span>
 <span class="badge">Community Management</span>
-</div>
 </div>
 
 <div class="card">
@@ -167,6 +158,7 @@ let currentUser = null;
 let isAdmin = false;
 let editingId = null;
 let projectCache = [];
+let authVersion = 0;
 
 function status(message) {
  $("status").textContent = message;
@@ -186,15 +178,24 @@ function dateText(timestamp) {
  return timestamp.toDate().toLocaleDateString();
 }
 
+function showError(prefix, error) {
+ console.error(prefix, error);
+ status(prefix + ": " + (error?.message || String(error)));
+}
+
 // SIGN UP
-$("signupBtn").onclick = async () => {
+$("signupBtn").addEventListener("click", async () => {
  const email = $("email").value.trim();
  const password = $("password").value;
+ const button = $("signupBtn");
 
  if (!email) return status("Enter your email address.");
  if (password.length < 6) {
   return status("Password must be at least 6 characters.");
  }
+
+ button.disabled = true;
+ status("Creating your account...");
 
  try {
   const credential = await createUserWithEmailAndPassword(
@@ -209,41 +210,51 @@ $("signupBtn").onclick = async () => {
 
   status("Account created successfully!");
  } catch(e) {
-  status("Sign up error: " + e.message);
+  showError("Sign up failed", e);
+ } finally {
+  button.disabled = false;
  }
-};
+});
 
 // LOGIN
-$("loginBtn").onclick = async () => {
+$("loginBtn").addEventListener("click", async () => {
+ const email = $("email").value.trim();
+ const password = $("password").value;
+ const button = $("loginBtn");
+
+ if (!email) return status("Enter your email address.");
+ if (!password) return status("Enter your password.");
+
+ button.disabled = true;
+ status("Logging in...");
+
  try {
-  await signInWithEmailAndPassword(
-   auth,
-   $("email").value.trim(),
-   $("password").value
-  );
-  status("Logged in successfully!");
+  await signInWithEmailAndPassword(auth, email, password);
+  status("Login successful! Loading your account...");
  } catch(e) {
-  status("Login error: " + e.message);
+  showError("Login failed", e);
+ } finally {
+  button.disabled = false;
  }
-};
+});
 
 // LOGOUT
-$("logoutBtn").onclick = async () => {
+$("logoutBtn").addEventListener("click", async () => {
  try {
   await signOut(auth);
-  resetForm();
-  status("Logged out.");
+  status("Logged out successfully.");
  } catch(e) {
-  status(e.message);
+  showError("Logout failed", e);
  }
-};
+});
 
-// AUTH STATE AND ADMIN ROLE CHECK
+// AUTH STATE
 onAuthStateChanged(auth, async user => {
+ const version = ++authVersion;
+
  currentUser = user;
  isAdmin = false;
  editingId = null;
- resetForm();
 
  $("accountInfo").textContent =
   user ? "Logged in: " + user.email : "Not logged in";
@@ -253,23 +264,43 @@ onAuthStateChanged(auth, async user => {
  $("projectForm").classList.toggle("hidden", !user);
  $("adminDashboard").classList.add("hidden");
 
+ $("projectTitle").value = "";
+ $("projectDescription").value = "";
+ $("projectLink").value = "";
+ $("saveProjectBtn").textContent = "Add Project";
+ $("cancelEditBtn").classList.add("hidden");
+
  if (user) {
   try {
    const profile = await getDoc(doc(db, "users", user.uid));
 
+   if (version !== authVersion) return;
+
    isAdmin = profile.exists() &&
     profile.data().role === "admin";
+
+   if (!profile.exists()) {
+    status("Logged in, but your Firestore user profile is missing. Contact the portfolio admin.");
+   }
   } catch(e) {
-   status("Profile check failed: " + e.message);
+   if (version !== authVersion) return;
+   showError("Profile check failed", e);
   }
  }
 
+ if (version !== authVersion) return;
+
  await loadProjects();
+ if (version !== authVersion) return;
+
  await loadAdminDashboard();
 });
 
 // LOAD PROJECTS
 async function loadProjects() {
+ const host = $("projectsList");
+ host.textContent = "Loading projects...";
+
  try {
   const snap = await getDocs(query(
    collection(db, "projects"),
@@ -282,18 +313,15 @@ async function loadProjects() {
   }));
 
   renderProjects();
-
-  if (isAdmin) {
-   $("adminProjectCount").textContent = projectCache.length;
-  }
+  $("adminProjectCount").textContent = projectCache.length;
  } catch(e) {
-  $("projectsList").textContent =
-   "Could not load projects: " + e.message +
-   " — Check Firestore Security Rules.";
+  console.error("Project loading error:", e);
+  host.textContent = "Could not load projects: " +
+   e.message + ". Check Firestore Rules and your connection.";
  }
 }
 
-// ADMIN DASHBOARD AND USER LIST
+// ADMIN DASHBOARD
 async function loadAdminDashboard() {
  const panel = $("adminDashboard");
 
@@ -305,14 +333,12 @@ async function loadAdminDashboard() {
  if (!currentUser || !isAdmin) return;
 
  const adminUid = currentUser.uid;
-
  $("adminProjectCount").textContent = projectCache.length;
  $("adminUsersList").textContent = "Loading users...";
 
  try {
   const usersSnap = await getDocs(collection(db, "users"));
 
-  // Do not render data if the session changed while loading.
   if (!currentUser ||
       currentUser.uid !== adminUid ||
       !isAdmin) return;
@@ -337,13 +363,11 @@ async function loadAdminDashboard() {
 
    const roleText = document.createElement("p");
    roleText.className = "small";
-   roleText.textContent =
-    "Current role: " + (data.role || "user");
+   roleText.textContent = "Current role: " + (data.role || "user");
 
    const roleSelect = document.createElement("select");
    roleSelect.setAttribute(
-    "aria-label",
-    "Role for " + (data.email || "user")
+    "aria-label", "Role for " + (data.email || "user")
    );
 
    ["user", "admin"].forEach(role => {
@@ -359,15 +383,14 @@ async function loadAdminDashboard() {
    roleSelect.value = currentRole;
 
    const saveRoleBtn = document.createElement("button");
+   saveRoleBtn.type = "button";
    saveRoleBtn.textContent = "Save Role";
 
    const isSelf = userDoc.id === adminUid;
-
-   // Protect the currently logged-in admin from accidental demotion.
    roleSelect.disabled = isSelf;
    saveRoleBtn.disabled = isSelf;
 
-   saveRoleBtn.onclick = async () => {
+   saveRoleBtn.addEventListener("click", async () => {
     if (!currentUser || !isAdmin) {
      return status("Admin permission required.");
     }
@@ -388,7 +411,7 @@ async function loadAdminDashboard() {
     } finally {
      saveRoleBtn.disabled = false;
     }
-   };
+   });
 
    row.append(email, roleText, roleSelect, saveRoleBtn);
 
@@ -403,9 +426,9 @@ async function loadAdminDashboard() {
    list.append(row);
   });
  } catch(e) {
+  showError("Unable to load admin users", e);
   $("adminUsersList").textContent =
-   "Unable to load users. Check Firestore Security Rules.";
-  console.error("Admin dashboard error:", e);
+   "Unable to load users: " + e.message;
  }
 }
 
@@ -424,7 +447,6 @@ async function updateUserRole(uid, newRole) {
  }
 
  try {
-  // Recheck the current admin profile before writing.
   const adminProfile = await getDoc(
    doc(db, "users", currentUser.uid)
   );
@@ -443,17 +465,16 @@ async function updateUserRole(uid, newRole) {
   status("User role updated successfully.");
   await loadAdminDashboard();
  } catch(e) {
-  console.error("Role update error:", e);
-  status("Role update failed: " + e.message);
+  showError("Role update failed", e);
  }
 }
 
 // REFRESH DASHBOARD
-$("refreshAdminBtn").onclick = async () => {
+$("refreshAdminBtn").addEventListener("click", async () => {
  await loadProjects();
  await loadAdminDashboard();
  status("Dashboard refreshed.");
-};
+});
 
 // RENDER PROJECTS
 function renderProjects() {
@@ -461,8 +482,7 @@ function renderProjects() {
  host.replaceChildren();
 
  if (!projectCache.length) {
-  host.textContent =
-   "No community projects yet. Log in to add one!";
+  host.textContent = "No community projects yet. Log in to add one!";
   return;
  }
 
@@ -499,23 +519,26 @@ function renderProjects() {
   const actions = document.createElement("div");
 
   const like = document.createElement("button");
+  like.type = "button";
   like.textContent = "♥ Like";
   like.disabled = !currentUser;
-  like.onclick = () => toggleLike(p.id);
+  like.addEventListener("click", () => toggleLike(p.id));
   actions.append(like);
 
   if (currentUser &&
       (p.ownerId === currentUser.uid || isAdmin)) {
    const edit = document.createElement("button");
+   edit.type = "button";
    edit.textContent = "Edit";
    edit.className = "secondary";
-   edit.onclick = () => startEdit(p);
+   edit.addEventListener("click", () => startEdit(p));
    actions.append(edit);
 
    const del = document.createElement("button");
+   del.type = "button";
    del.textContent = "Delete";
    del.className = "danger";
-   del.onclick = () => deleteProject(p.id);
+   del.addEventListener("click", () => deleteProject(p.id));
    actions.append(del);
   }
 
@@ -528,21 +551,24 @@ function renderProjects() {
   const commentInput = document.createElement("textarea");
   commentInput.maxLength = 1000;
   commentInput.placeholder = currentUser
-   ? "Write a comment…"
+   ? "Write a comment..."
    : "Log in to comment";
   commentInput.disabled = !currentUser;
   card.append(commentInput);
 
   const commentBtn = document.createElement("button");
+  commentBtn.type = "button";
   commentBtn.textContent = "Post Comment";
   commentBtn.disabled = !currentUser;
-  commentBtn.onclick = () =>
-   postComment(p.id, commentInput.value, null);
+  commentBtn.addEventListener("click", async () => {
+   await postComment(p.id, commentInput.value, null);
+   commentInput.value = "";
+  });
 
   card.append(commentBtn);
 
   const commentList = document.createElement("div");
-  commentList.textContent = "Loading comments…";
+  commentList.textContent = "Loading comments...";
   card.append(commentList);
 
   host.append(card);
@@ -601,11 +627,11 @@ async function saveProject() {
   await loadProjects();
   await loadAdminDashboard();
  } catch(e) {
-  status("Save error: " + e.message);
+  showError("Save failed", e);
  }
 }
 
-$("saveProjectBtn").onclick = saveProject;
+$("saveProjectBtn").addEventListener("click", saveProject);
 
 function startEdit(p) {
  if (!currentUser ||
@@ -620,7 +646,7 @@ function startEdit(p) {
  $("saveProjectBtn").textContent = "Save Changes";
  $("cancelEditBtn").classList.remove("hidden");
  $("projectForm").classList.remove("hidden");
- $("projectForm").scrollIntoView({behavior: "smooth"});
+ $("projectForm").scrollIntoView({behavior:"smooth"});
 }
 
 function resetForm() {
@@ -632,7 +658,7 @@ function resetForm() {
  $("cancelEditBtn").classList.add("hidden");
 }
 
-$("cancelEditBtn").onclick = resetForm;
+$("cancelEditBtn").addEventListener("click", resetForm);
 
 // DELETE PROJECT
 async function deleteProject(id) {
@@ -643,9 +669,9 @@ async function deleteProject(id) {
   return status("You cannot delete this project.");
  }
 
- if (!confirm(
-  "Delete this project? Its comments and likes may remain."
- )) return;
+ if (!confirm("Delete this project? Its comments and likes may remain.")) {
+  return;
+ }
 
  try {
   await deleteDoc(doc(db, "projects", id));
@@ -653,19 +679,16 @@ async function deleteProject(id) {
   await loadProjects();
   await loadAdminDashboard();
  } catch(e) {
-  status("Delete error: " + e.message);
+  showError("Delete failed", e);
  }
 }
 
 // LIKE / UNLIKE
 async function toggleLike(projectId) {
- if (!currentUser) {
-  return status("Log in to like projects.");
- }
+ if (!currentUser) return status("Log in to like projects.");
 
- const likeRef = doc(
-  db, "projects", projectId, "likes", currentUser.uid
- );
+ const uid = currentUser.uid;
+ const likeRef = doc(db, "projects", projectId, "likes", uid);
 
  try {
   await runTransaction(db, async tx => {
@@ -675,7 +698,7 @@ async function toggleLike(projectId) {
     tx.delete(likeRef);
    } else {
     tx.set(likeRef, {
-     userId: currentUser.uid,
+     userId: uid,
      createdAt: serverTimestamp()
     });
    }
@@ -683,7 +706,7 @@ async function toggleLike(projectId) {
 
   status("Like updated.");
  } catch(e) {
-  status("Like error: " + e.message);
+  showError("Like failed", e);
  }
 }
 
@@ -711,6 +734,8 @@ async function loadComments(projectId, container) {
    const item = document.createElement("div");
    item.className = "comment";
 
+   if (c.parentId) item.style.marginLeft = "18px";
+
    const who = document.createElement("b");
    who.textContent = c.userEmail || "Member";
 
@@ -719,32 +744,21 @@ async function loadComments(projectId, container) {
 
    item.append(who, body);
 
-   if (c.parentId) {
-    item.style.marginLeft = "18px";
-   }
-
    if (currentUser) {
     const reply = document.createElement("button");
+    reply.type = "button";
     reply.className = "secondary";
     reply.textContent = "Reply";
-
-    reply.onclick = async () => {
-     const text = prompt("Write your reply:");
-     if (text && text.trim()) {
-      await postComment(projectId, text, c.id);
-     }
-    };
-
-    item.append(reply);
    }
 
    if (currentUser &&
        (c.userId === currentUser.uid || isAdmin)) {
     const del = document.createElement("button");
+    del.type = "button";
     del.className = "danger";
     del.textContent = "Delete";
 
-    del.onclick = async () => {
+    del.addEventListener("click", async () => {
      if (!confirm("Delete this comment?")) return;
 
      try {
@@ -752,10 +766,11 @@ async function loadComments(projectId, container) {
        db, "projects", projectId, "comments", c.id
       ));
       await loadComments(projectId, container);
+      status("Comment deleted.");
      } catch(e) {
-      status("Comment delete error: " + e.message);
+      showError("Comment delete failed", e);
      }
-    };
+    });
 
     item.append(del);
    }
@@ -764,16 +779,13 @@ async function loadComments(projectId, container) {
   });
  } catch(e) {
   console.error("Comment load error:", e);
-  container.textContent =
-   "Comments unavailable. Check Firestore Rules.";
+  container.textContent = "Comments unavailable: " + e.message;
  }
 }
 
 // POST COMMENT OR REPLY
 async function postComment(projectId, text, parentId) {
- if (!currentUser) {
-  return status("Log in to comment.");
- }
+ if (!currentUser) return status("Log in to comment.");
 
  text = text.trim();
 
@@ -788,4 +800,20 @@ async function postComment(projectId, text, parentId) {
    text,
    userId: currentUser.uid,
    userEmail: currentUser.email,
-   parentId
+   parentId: parentId || null,
+   createdAt: serverTimestamp()
+  });
+
+  status(parentId ? "Reply posted successfully." : "Comment posted successfully.");
+  await loadProjects();
+ } catch(e) {
+  showError("Comment failed", e);
+ }
+}
+
+// INITIAL PAGE STATUS
+status("Firebase initialized. You can log in or sign up.");
+</script>
+
+</body>
+</html>
