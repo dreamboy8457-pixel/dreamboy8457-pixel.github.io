@@ -140,7 +140,37 @@ a{color:#7bbcff;overflow-wrap:anywhere}
 <button id="saveProjectBtn" type="button">Add Project</button>
 <button id="cancelEditBtn" type="button" class="secondary hidden">Cancel Edit</button>
 </div>
+ 
+<!-- PROJECT SEARCH & FILTERS -->
+<div class="card" style="max-width:900px;margin:16px auto">
+  <h2>🔎 Explore Projects</h2>
 
+  <input
+    id="projectSearch"
+    type="search"
+    placeholder="Search projects by name..."
+    style="width:100%;padding:12px;margin-bottom:12px"
+  >
+
+  <select
+    id="projectCategory"
+    style="width:100%;padding:12px;margin-bottom:12px"
+  >
+    <option value="all">All Projects</option>
+    <option value="discord">Discord</option>
+    <option value="minecraft">Minecraft</option>
+    <option value="development">Development</option>
+  </select>
+
+  <select
+    id="projectSort"
+    style="width:100%;padding:12px"
+  >
+    <option value="newest">Newest First</option>
+    <option value="liked">Most Liked</option>
+  </select>
+</div>
+ 
 <div id="projectsList">Loading projects...</div>
 </div>
 
@@ -704,16 +734,16 @@ $("refreshAdminBtn").addEventListener("click", async () => {
 });
 
 // RENDER PROJECTS
-function renderProjects() {
+function renderProjects(projects = projectCache) {
  const host = $("projectsList");
  host.replaceChildren();
 
- if (!projectCache.length) {
+ if (!projects.length) {
   host.textContent = "No community projects yet. Log in to add one!";
   return;
  }
 
- projectCache.forEach(p => {
+ projects.forEach(p => {
   const card = document.createElement("div");
   card.className = "card project";
 
@@ -802,7 +832,41 @@ function renderProjects() {
   loadComments(p.id, commentList);
  });
 }
+ 
+// PROJECT SEARCH & FILTERS
+function filterProjects() {
+ const search = $("projectSearch").value.toLowerCase().trim();
+ const category = $("projectCategory").value;
+ const sort = $("projectSort").value;
 
+ let filtered = projectCache.filter(p => {
+  const text = [
+   p.title || "",
+   p.description || "",
+   p.category || ""
+  ].join(" ").toLowerCase();
+
+  const matchesSearch = text.includes(search);
+  const projectCategory = (p.category || "").toLowerCase();
+
+  const matchesCategory =
+   category === "all" ||
+   projectCategory.includes(category);
+
+  return matchesSearch && matchesCategory;
+ });
+
+ if (sort === "liked") {
+  filtered.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+ }
+
+ renderProjects(filtered);
+}
+
+$("projectSearch").addEventListener("input", filterProjects);
+$("projectCategory").addEventListener("change", filterProjects);
+$("projectSort").addEventListener("change", filterProjects);
+ 
 // ADD OR EDIT PROJECT
 async function saveProject() {
  if (!currentUser) return status("Log in first.");
