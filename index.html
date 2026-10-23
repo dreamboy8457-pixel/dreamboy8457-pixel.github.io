@@ -52,12 +52,26 @@ a{color:#7bbcff;overflow-wrap:anywhere}
 </head>
 <body>
 
-<header>
-<h1>VantaDream</h1>
-<p>Discord &amp; Minecraft Portfolio</p>
-<p class="small">Projects • Communities • Development</p>
+<header style="position:relative">
+  <button id="notificationBtn" type="button" aria-label="Notifications"
+    style="position:absolute;top:12px;right:12px;background:#102544;border:1px solid #4da3ff;border-radius:50%;width:44px;height:44px;font-size:20px">
+    🔔
+    <span id="notificationCount"
+      style="display:none;position:absolute;top:-5px;right:-5px;background:#e63946;color:white;border-radius:50%;min-width:18px;height:18px;font-size:11px;line-height:18px">
+      0
+    </span>
+  </button>
+
+  <h1>VantaDream</h1>
+  <p>Discord &amp; Minecraft Portfolio</p>
+  <p class="small">Projects • Communities • Development</p>
 </header>
 
+<div id="notificationPanel" class="card hidden" style="max-width:900px;margin:16px auto">
+  <h2>🔔 Notifications</h2>
+  <div id="notificationList" class="small">No notifications yet.</div>
+  <button id="markNotificationsRead" type="button" class="secondary">Mark All as Read</button>
+</div>
 <section>
 <div class="card">
 <h2>Account</h2>
@@ -190,7 +204,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = id => document.getElementById(id);
-
+ 
+// NOTIFICATION PANEL TOGGLE
+$("notificationBtn").addEventListener("click", () => {
+ const panel = $("notificationPanel");
+ panel.classList.toggle("hidden");
+});
+ 
 let currentUser = null;
 let isAdmin = false;
 let editingId = null;
