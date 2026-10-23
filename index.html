@@ -71,6 +71,26 @@ a{color:#7bbcff;overflow-wrap:anywhere}
 </div>
 
 <button id="logoutBtn" type="button" class="secondary hidden">Log Out</button>
+ <div id="profileSection" class="hidden">
+  <hr>
+  <h2>My Profile</h2>
+  <div class="profile-card">
+    <img id="profilePreview" class="profile-avatar hidden" alt="Profile Photo">
+    <h3 id="profileDisplayName">Your Profile</h3>
+    <p id="profileBioDisplay" class="small">No bio added yet.</p>
+
+    <label for="profileName">Username</label>
+    <input id="profileName" type="text" maxlength="30" placeholder="Enter your username">
+
+    <label for="profileBio">Bio</label>
+    <textarea id="profileBio" maxlength="200" placeholder="Write something about yourself"></textarea>
+
+    <label for="profilePhoto">Profile Photo URL (HTTPS)</label>
+    <input id="profilePhoto" type="url" placeholder="https://example.com/photo.png">
+
+    <button id="saveProfileBtn" type="button">Save Profile</button>
+  </div>
+ </div>
 <p id="status" role="status" aria-live="polite"></p>
 </div>
 
@@ -199,7 +219,70 @@ function showError(prefix, error) {
  console.error(prefix, error);
  status(prefix + ": " + (error?.message || String(error)));
 }
+// PROFILE DISPLAY
+function displayProfile(data = {}) {
+ const username = data.username ||
+  currentUser?.email?.split("@")[0] || "User";
+ const bio = data.bio || "";
+ const photoURL = safeLink(data.photoURL || "");
 
+ $("profileName").value = data.username || "";
+ $("profileBio").value = bio;
+ $("profilePhoto").value = photoURL;
+ $("profileDisplayName").textContent = username;
+ $("profileBioDisplay").textContent = bio || "No bio added yet.";
+
+ const preview = $("profilePreview");
+
+ if (photoURL) {
+  preview.src = photoURL;
+  preview.classList.remove("hidden");
+ } else {
+  preview.removeAttribute("src");
+  preview.classList.add("hidden");
+ }
+}
+
+// SAVE PROFILE
+$("saveProfileBtn").addEventListener("click", async () => {
+ if (!currentUser) return status("Please log in first.");
+
+ const username = $("profileName").value.trim();
+ const bio = $("profileBio").value.trim();
+ const rawPhoto = $("profilePhoto").value.trim();
+ const photoURL = rawPhoto ? safeLink(rawPhoto) : "";
+
+ if (username.length < 2 || username.length > 30) {
+  return status("Username must be 2–30 characters.");
+ }
+
+ if (bio.length > 200) {
+  return status("Bio must be 200 characters or less.");
+ }
+
+ if (rawPhoto && !photoURL) {
+  return status("Photo URL must start with https://");
+ }
+
+ const button = $("saveProfileBtn");
+ button.disabled = true;
+
+ try {
+  await updateDoc(doc(db, "users", currentUser.uid), {
+   username: username,
+   bio: bio,
+   photoURL: photoURL
+  });
+
+  displayProfile({ username, bio, photoURL });
+  status("Profile saved successfully!");
+ } catch (error) {
+  showError("Profile save failed", error);
+ } finally {
+  button.disabled = false;
+ }
+});
+ 
 // SIGN UP
 $("signupBtn").addEventListener("click", async () => {
  const email = $("email").value.trim();
@@ -278,6 +361,7 @@ onAuthStateChanged(auth, async user => {
 
  $("authForm").classList.toggle("hidden", !!user);
  $("logoutBtn").classList.toggle("hidden", !user);
+ $("profileSection").classList.toggle("hidden", !user);
  $("projectForm").classList.toggle("hidden", !user);
  $("adminDashboard").classList.add("hidden");
 
@@ -295,7 +379,9 @@ onAuthStateChanged(auth, async user => {
 
    isAdmin = profile.exists() &&
     profile.data().role === "admin";
-
+   
+displayProfile(profile.exists() ? profile.data() : {});
+   
    if (!profile.exists()) {
     status("Logged in, but your Firestore user profile is missing. Contact the portfolio admin.");
    }
