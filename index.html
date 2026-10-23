@@ -248,6 +248,67 @@ function showError(prefix, error) {
  console.error(prefix, error);
  status(prefix + ": " + (error?.message || String(error)));
 }
+
+ // LOAD NOTIFICATIONS
+function loadNotifications() {
+ if (notificationUnsubscribe) {
+  notificationUnsubscribe();
+  notificationUnsubscribe = null;
+ }
+
+ notificationCache = [];
+
+ if (!currentUser) {
+  $("notificationCount").style.display = "none";
+  $("notificationList").textContent = "Log in to view notifications.";
+  return;
+ }
+
+ const notificationsRef = collection(
+  db, "users", currentUser.uid, "notifications"
+ );
+
+ notificationUnsubscribe = onSnapshot(
+  query(notificationsRef, orderBy("createdAt", "desc"), limit(50)),
+  snapshot => {
+   notificationCache = snapshot.docs.map(item => ({
+    id: item.id,
+    ...item.data()
+   }));
+
+   const unread = notificationCache.filter(n => !n.read).length;
+   const count = $("notificationCount");
+
+   count.textContent = unread > 99 ? "99+" : String(unread);
+   count.style.display = unread > 0 ? "block" : "none";
+
+   const list = $("notificationList");
+   list.replaceChildren();
+
+   if (!notificationCache.length) {
+    list.textContent = "No notifications yet.";
+    return;
+   }
+
+   notificationCache.forEach(n => {
+    const item = document.createElement("div");
+    item.className = "comment";
+
+    const message = document.createElement("p");
+    message.textContent = n.message || "New notification";
+
+    const state = document.createElement("span");
+    state.className = "small";
+    state.textContent = n.read ? "Read" : "● Unread";
+
+    item.append(message, state);
+    list.append(item);
+   });
+  },
+  error => showError("Notifications failed to load", error)
+ );
+}
+ 
 // PROFILE DISPLAY
 function displayProfile(data = {}) {
  const username = data.username ||
