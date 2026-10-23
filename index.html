@@ -187,9 +187,14 @@ import {
  query,
  orderBy,
  serverTimestamp,
- runTransaction
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-
+ runTransaction,
+ onSnapshot,
+ where,
+ limit,
+ writeBatch
+} from
+ "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+ 
 const firebaseConfig = {
  apiKey: "AIzaSyDBZpufUiuQ5IewQguigSChy9FzevxwJUo",
  authDomain: "vantadream.firebaseapp.com",
@@ -216,7 +221,11 @@ let isAdmin = false;
 let editingId = null;
 let projectCache = [];
 let authVersion = 0;
-
+ 
+// NOTIFICATION STATE
+let notificationUnsubscribe = null;
+let notificationCache = [];
+ 
 function status(message) {
  $("status").textContent = message;
 }
