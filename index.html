@@ -446,6 +446,9 @@ onAuthStateChanged(auth, async user => {
  isAdmin = false;
  editingId = null;
 
+    // CONNECT NOTIFICATIONS TO LOGIN
+ loadNotifications();
+
  $("accountInfo").textContent =
   user ? "Logged in: " + user.email : "Not logged in";
 
