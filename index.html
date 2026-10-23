@@ -309,6 +309,37 @@ function loadNotifications() {
  );
 }
  
+ // MARK ALL NOTIFICATIONS AS READ
+$("markNotificationsRead").addEventListener("click", async () => {
+ if (!currentUser) {
+  status("Please log in first.");
+  return;
+ }
+
+ const unread = notificationCache.filter(n => !n.read);
+
+ if (!unread.length) {
+  status("No unread notifications.");
+  return;
+ }
+
+ const batch = writeBatch(db);
+
+ unread.forEach(n => {
+  batch.update(
+   doc(db, "users", currentUser.uid, "notifications", n.id),
+   { read: true }
+  );
+ });
+
+ try {
+  await batch.commit();
+  status("All notifications marked as read.");
+ } catch (error) {
+  showError("Could not mark notifications as read", error);
+ }
+});
+ 
 // PROFILE DISPLAY
 function displayProfile(data = {}) {
  const username = data.username ||
